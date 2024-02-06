@@ -45,41 +45,41 @@ letter_dict = {
 # primarily position, speed, etc.
 component_dict = {
     SWOOP: [
-        "S1 0 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     UNDERTURN: [
-        "S1 1 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     OVERTURN: [
-        "S1 2 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     WAVE: [
-        "S1 3 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     OVAL: [
-        "S1 4 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     BROKEN_OVAL: [
-        "S1 5 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     REVERSE_OVAL: [
-        "S1 6 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     ASCENDING_STEM: [
-        "S1 7 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     DESCENDING_STEM: [
-        "S1 8 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ],
     DOT: [
-        "S1 9 0 0 0 0"
+        "000000010000000100000001000000010000000"
     ]
 }
 
 def brushstroke(word, x, y):
     traj_array = []
 
-    traj_array.append("S1 " + str(x) + " " + str(y) +" 0 0 0") # go to starting position 
+    # traj_array.append("S1 " + str(x) + " " + str(y) +" 0 0 0") # go to starting position 
 
     for c in word:
         # add each character
