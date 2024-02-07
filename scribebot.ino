@@ -4,9 +4,9 @@
 #include <LiquidCrystal_I2C.h>
 
 // defining pins
-#define Y_LIMIT_SWITCH_PIN 22
-#define X_LIMIT_SWITCH_PIN 23
-#define Z_LIMIT_SWITCH_PIN 24
+#define X_LIMIT_SWITCH_PIN 22
+#define Y_LIMIT_SWITCH_PIN 23
+#define Z_LIMIT_SWITCH_PIN 25
 
 #define STEPPER_LEFT_STEP 28
 #define STEPPER_LEFT_DIR 29
@@ -14,18 +14,21 @@
 #define STEPPER_RIGHT_STEP 30
 #define STEPPER_RIGHT_DIR 31
 
-#define STEPPER_Z_DIR 32
-#define STEPPER_Z_STEP 33
+#define STEPPER_Z_STEP 32
+#define STEPPER_Z_DIR 33
 
 #define START_BUTTON_PIN 49 
-#define ESTOP_BUTTON_PIN 1000 // fix
+// #define ESTOP_BUTTON_PIN 1000 // fix
 
-LiquidCrystal_I2C lcd(0x27, 16, 2); // lcd fix maybe
+// LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // steppers
 AccelStepper stepperLeft(AccelStepper::DRIVER, STEPPER_LEFT_STEP, STEPPER_LEFT_DIR);   // clockwise is positive
 AccelStepper stepperRight(AccelStepper::DRIVER, STEPPER_RIGHT_STEP, STEPPER_RIGHT_DIR);  // clockwise is positive
 AccelStepper stepperZ(AccelStepper::DRIVER, STEPPER_Z_STEP, STEPPER_Z_DIR); // up is positive
+
+// AccelStepper stepperPitch(AccelStepper::FULL4WIRE, 34, 35, 36, 37);
+// AccelStepper stepperPitch(8, 8,10,9,11);
 
 /*
 COREXY TRUTH TABLE:
@@ -55,6 +58,9 @@ float y_pose = 0;
 
 float x_next = 0;
 float y_next = 0;
+// const int stepsPerRevolution = 2038;
+// Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 11);
+
 
 // x, y is all we need right now
 void moveCartesian(float x_target, float y_target) {  // in mm
@@ -85,7 +91,17 @@ void setup() {
 
   stepperZ.setMaxSpeed(1600);
   stepperZ.setAcceleration(800);
-  stepperZ.setSpeed(800);
+  stepperZ.setSpeed(400);
+
+  // stepperRight.moveTo(400);
+  // stepperLeft.moveTo(400);
+  // stepperZ.moveTo(100);
+
+  // stepperPitch.setMaxSpeed(1000000);
+  // stepperPitch.setAcceleration(1000000);
+  // stepperPitch.setSpeed(1000000);
+
+  // stepperPitch.moveTo(2048);
 
   // set up limit switch pins
   pinMode(Y_LIMIT_SWITCH_PIN, INPUT);
@@ -95,13 +111,15 @@ void setup() {
   // home the system
   home();
 
-  // moveCartesian(20, 20);
+  moveCartesian(20, 20);
 
   // todo: attach interrupt to estop button
 
-  lcd.init();
-  lcd.backlight();
-  display("hello scribebot!", 0, true);
+  // lcd.init();
+  // lcd.backlight();
+  // display("hello scribebot!", 0, true);
+
+  Serial.println("hello!");
 }
 
 #define GCODE_LINE_LENGTH 41
@@ -117,52 +135,81 @@ bool mid_job = false;
 bool button_pressed_temp = true;
 
 void loop() {
-  stepperZ.run();
-  // Serial.println(digitalRead(Z_LIMIT_SWITCH_PIN));
-  // if(!sd_inserted) { // sd not inserted yet, check if inserted
-  //   display("Waiting for SD...", 0, false);
-  //   int sd_inserted_check = SD.begin();
-  //   if (sd_inserted_check==0) { // no SD card
-  //     Serial.println("no sd, waiting 1 second...");
-  //     delay(1000); // wait one second before trying again
-  //   } else {
-  //     display("SD inserted!", 0, true);
-  //     display("Press button :)", 1, false);
-  //     sd_inserted = true;
-  //     // add an interrupt for when the SD is removed? this can come later lol
-  //   }
-  // } else { // sd is now inserted
-
-  //   if (!mid_job) { // not mid job, check for button press
-  //     if (digitalRead(START_BUTTON_PIN)==HIGH) { // button is pressed; start SD buffer and start job
-  //       mid_job = true;
-  //       display("JOB IN PROGRESS", 0, true);
-  //       display("Homing...", 1, false);
-  //       home();
-  //       display("Executing...", 1, false);
-  //       startSDBuffer();
-  //     }
-  //   } else { // we are mid job
-  //     if (reachedTarget()) {
-  //       if (numLinesRead < numLines) { // job not done, keep reading into buffer
-  //         updateSDBuffer();
-  //       } else { // we are done! 
-  //         display("JOB COMPLETED!", 0, true);
-  //         delay(1000);
-  //         mid_job = false;
-  //       }
-  //     }
-  //     stepperLeft.runSpeedToPosition();
-  //     stepperRight.runSpeedToPosition();
-  //   }
+  // if (stepperRight.distanceToGo()==0) {
+  //   stepperRight.moveTo(-stepperRight.currentPosition());
   // }
+  // if (stepperLeft.distanceToGo()==0) {
+  //   stepperLeft.moveTo(-stepperLeft.currentPosition());
+  // }
+  // if (stepperZ.distanceToGo()==0) {
+  //   stepperZ.moveTo(-stepperZ.currentPosition());
+  // }
+  stepperRight.run();
+  stepperLeft.run();
+  stepperZ.run();
+  // Serial.print(digitalRead(X_LIMIT_SWITCH_PIN));
+  // Serial.print(digitalRead(Y_LIMIT_SWITCH_PIN));
+  // Serial.println(digitalRead(Z_LIMIT_SWITCH_PIN));
+  return;
+  // 	myStepper.setSpeed(5);
+	// myStepper.step(stepsPerRevolution);
+	// delay(1000);
+	
+	// // Rotate CCW quickly at 10 RPM
+	// myStepper.setSpeed(10);
+	// myStepper.step(-stepsPerRevolution);
+	// delay(1000);
+  // if (stepperPitch.distanceToGo() == 0) stepperPitch.moveTo(-stepperPitch.currentPosition());
+  // stepperPitch.runSpeedToPosition();
+  // Serial.println(digitalRead(Z_LIMIT_SWITCH_PIN));
+
+  if(!sd_inserted) { // sd not inserted yet, check if inserted
+    Serial.println("waiting for sd");
+    display("Waiting for SD...", 0, false);
+    int sd_inserted_check = SD.begin();
+    if (sd_inserted_check==0) { // no SD card
+      Serial.println("no sd, waiting 1 second...");
+      delay(1000); // wait one second before trying again
+    } else {
+      Serial.println("sd inserted!");
+      display("SD inserted!", 0, true);
+      display("Press button :)", 1, false);
+      sd_inserted = true;
+      // add an interrupt for when the SD is removed? this can come later lol
+    }
+  } else { // sd is now inserted
+
+    if (!mid_job) { // not mid job, check for button press
+      if (digitalRead(START_BUTTON_PIN)==HIGH) { // button is pressed; start SD buffer and start job
+        mid_job = true;
+        display("JOB IN PROGRESS", 0, true);
+        display("Homing...", 1, false);
+        home();
+        display("Executing...", 1, false);
+        startSDBuffer();
+      }
+    } else { // we are mid job
+      if (reachedTarget()) {
+        if (numLinesRead < numLines) { // job not done, keep reading into buffer
+          updateSDBuffer();
+        } else { // we are done! 
+          display("JOB COMPLETED!", 0, true);
+          delay(1000);
+          mid_job = false;
+        }
+      }
+      stepperLeft.runSpeedToPosition();
+      stepperRight.runSpeedToPosition();
+    }
+  }
 }
 
 // row is 0 or 1, max 16 chars per msg
 void display(String msg, int row, bool clearScreen) {
-  if (clearScreen) lcd.clear();
-  lcd.setCursor(0, row);
-  lcd.print(msg);
+  return;
+  // if (clearScreen) lcd.clear();
+  // lcd.setCursor(0, row);
+  // lcd.print(msg);
 }
 
 void startSDBuffer() { // reads first line
@@ -206,9 +253,10 @@ void estop() { // todo make this an interrupt
 }
 
 void home() {
-  display("Homing XY", 1, false);
+  // display("Homing XY", 1, false);
   homeXY();
-  display("Homing Z", 1, false);
+  Serial.println("asklfjadslk");
+  // display("Homing Z", 1, false);
   homeZ();
 }
 
@@ -218,16 +266,18 @@ void homeZ() {
 
   stepperZ.moveTo(-(MAX_Z_TRAVEL+50) * Z_STEPS_PER_MM);
   
-  int needed_zero_count = 5;
+  int needed_zero_count = 1;
 
   int z_zero_count = 0;
 
   while (z_zero_count < needed_zero_count) { // protection against noise
     // stepperZ.runSpeedToPosition();
-    stepperZ.run(); // idk why runSpeedToPosition doesn't work here tbh
+    // stepperZ.runSpeedToPosition(); // idk why runSpeedToPosition doesn't work here tbh
+    stepperZ.run();
 
     if (digitalRead(Z_LIMIT_SWITCH_PIN) == LOW) {
       z_zero_count++;
+      // todo stop stepper z
     } else {
       z_zero_count = 0;
     }
@@ -250,8 +300,8 @@ void homeXY() {
   int y_zero_count = 0;
 
   while (y_zero_count < needed_zero_count) { // protection against noise
-    stepperLeft.runSpeedToPosition ();
-    stepperRight.runSpeedToPosition ();
+    stepperLeft.run();
+    stepperRight.run ();
 
     if (digitalRead(Y_LIMIT_SWITCH_PIN) == LOW) {
       y_zero_count++;
@@ -285,8 +335,9 @@ void homeXY() {
   stepperLeft.stop();
   stepperRight.stop();
 
-  Serial.print("Reached X limit switch, zeroing motors...");
+  Serial.println("Reached X limit switch, zeroing motors...");
 
   stepperLeft.setCurrentPosition(0);
   stepperRight.setCurrentPosition(0);
+  return;
 }

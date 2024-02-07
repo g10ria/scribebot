@@ -3,9 +3,15 @@
     "strokes": [
         {
             "type": 0,
-            "value": "b",
+            "value": "hi",
             "x": 1,
             "y": 1
+        },
+        {
+            "type": 0,
+            "value": "hello",
+            "x": 2,
+            "y": 2
         }
     ]
 }
