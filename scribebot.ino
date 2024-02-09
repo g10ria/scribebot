@@ -53,16 +53,14 @@ float yaw_pose = 0;
 float pitch_next = 0;
 float yaw_next = 0;
 
-#define NUM_LOCS 3
-
-// DEFLOCS
-float locs[NUM_LOCS][5] = {
-  { 10, 30, 15, 0, 0},
-  { 10, 30, 15, 1, .25 },
-  { 10, 30, 15, 0 , 0}
-  // { 150, 100, 0, 0 },
-  // { 100, 100, 3, 0 },
-  // { 65, 65, 20, 0 }
+#define NUM_LOCS 6
+float locs[NUM_LOCS][5]{
+  { 0, 0, 20, 0, 0 },
+  { 120, 95, 25, 0, 0 },
+  { 125, 100, 25, 1, 0 },
+  { 130, 105, 25, 0, 0 },
+  { 135, 110, 25, 1, 0 },
+  { 140, 115, 25, 0, 0 }
 };
 
 int currLoc = 0;
@@ -76,24 +74,31 @@ int yaw_step = 0;
 bool yaw_direction = false;
 int yaw_steps_remaining = 0;
 
-unsigned long timePrevious = 0;
-unsigned long timeNow = 0;
+unsigned long pitch_timePrevious = 0;
+unsigned long pitch_timeNow = 0;
+
+unsigned long yaw_timePrevious = 0;
+unsigned long yaw_timeNow = 0;
+
+float pitch_speed = 0;
+float yaw_speed = 0;
 
 float leftDesiredSpeed = 1600.0;
 float rightDesiredSpeed = 1600.0;
-float zDesiredSpeed = 800.0;
-float pitchDesiredSpeed = 1000.0; // aka every 1000 micros
-float yawDesiredSpeed = 1000.0; // aka every 1000 micros
+float zDesiredSpeed = 2000.0;
+float pitchDesiredSpeed = 1000.0;  // aka every 1000 micros
+float yawDesiredSpeed = 1000.0;    // aka every 1000 micros
 
 // x, y is all we need right now
-void moveCartesian(int currLoc) {
-  float x_target = locs[currLoc][0];
-  float y_target = locs[currLoc][1];
-  float z_target = locs[currLoc][2];
-  float pitch_target = locs[currLoc][3];
-  float yaw_target = locs[currLoc][4];
+void moveCartesian(float x_target, float y_target, float z_target, float pitch_target, float yaw_target) {
+  stepperLeft.setSpeed(0);
+  stepperLeft.setMaxSpeed(0);
+  stepperRight.setSpeed(0);
+  stepperRight.setMaxSpeed(0);
+  stepperZ.setSpeed(0);
+  stepperZ.setMaxSpeed(0);
 
-  Serial.print("moving cartesian to: ");
+  Serial.print("\n----moving cartesian to: ");
   Serial.print(x_target);
   Serial.print(" ");
   Serial.print(y_target);
@@ -110,33 +115,18 @@ void moveCartesian(int currLoc) {
   float stepperZTarget = z_target * Z_STEPS_PER_MM;
 
   float stepperLeftOffset = stepperLeftTarget - stepperLeft.currentPosition();
-  float stepperRightOffset = stepperRightTarget - stepperLeft.currentPosition();
+  float stepperRightOffset = stepperRightTarget - stepperRight.currentPosition();
   float stepperZOffset = stepperZTarget - stepperZ.currentPosition();
-  Serial.println(stepperLeftOffset);
-  Serial.println(stepperRightOffset);
-  Serial.println(stepperZOffset);
-
-  float maxOffset = max(abs(stepperLeftOffset), abs(stepperRightOffset));
-
-  float scaleFactor = 1600.0/maxOffset; // making them scaled relatively, one of them being 1600
-  stepperLeft.setSpeed(scaleFactor * stepperLeftOffset);
-  stepperRight.setSpeed(scaleFactor * stepperRightOffset);
-  stepperLeft.setMaxSpeed(scaleFactor * stepperLeftOffset);
-  stepperRight.setMaxSpeed(scaleFactor * stepperRightOffset);
-  Serial.println("XY STEPPER SPEEDS");
-  Serial.println(scaleFactor * stepperLeftOffset);
-  Serial.println(scaleFactor * stepperRightOffset);
-  Serial.println();
 
   stepperLeft.moveTo(stepperLeftTarget);
   stepperRight.moveTo(stepperRightTarget);
   stepperZ.moveTo(stepperZTarget);
 
   // pitch pose is in terms of steps
-  float stepperPitchTarget = pitch_target * 1300.0; // todo comment this value and verify with zeroing jig
+  float stepperPitchTarget = pitch_target * 1000.0;  // todo comment this value and verify with zeroing jig
   float stepperPitchOffset = stepperPitchTarget - pitch_pose;
   pitch_next = stepperPitchTarget;
-  Serial.println("pitch target info"); Serial.println(stepperPitchTarget); Serial.println(stepperPitchOffset);
+
   pitch_steps_remaining = abs(stepperPitchOffset);
   pitch_direction = stepperPitchOffset > 0;
   pitch_step = 0;
@@ -145,10 +135,18 @@ void moveCartesian(int currLoc) {
   float stepperYawTarget = yaw_target * 8043.0;
   float stepperYawOffset = stepperYawTarget - yaw_pose;
   yaw_next = stepperYawTarget;
-  Serial.println("yaw target info"); Serial.println(stepperYawTarget); Serial.println(stepperYawOffset);
   yaw_steps_remaining = abs(stepperYawOffset);
   yaw_direction = stepperYawOffset > 0;
   yaw_step = 0;
+
+  // Serial.println("XYZ TARGET INFO");
+  // Serial.println(stepperLeftOffset);
+  // Serial.println(stepperRightOffset);
+  // Serial.println(stepperZOffset);
+  // Serial.print("PITCH # STEPS: ");
+  // Serial.println(stepperPitchOffset);
+  // Serial.print("YAW # STEPS: ");
+  // Serial.println(stepperYawOffset);
 
   float leftFastestTime = abs(stepperLeftOffset) / leftDesiredSpeed;
   float rightFastestTime = abs(stepperRightOffset) / rightDesiredSpeed;
@@ -157,16 +155,30 @@ void moveCartesian(int currLoc) {
   float yawFastestTime = abs(stepperYawOffset) / yawDesiredSpeed;
 
   float maximalTimeNeeded = max(leftFastestTime, max(rightFastestTime, max(zFastestTime, max(pitchFastestTime, yawFastestTime))));
-  Serial.println("Max time needed: ");
-  Serial.println(maximalTimeNeeded);
-  Serial.println("Proposed speeds:");
-  Serial.println(stepperLeftOffset/maximalTimeNeeded);
-  Serial.println(stepperRightOffset/maximalTimeNeeded);
-  Serial.println(stepperZOffset/maximalTimeNeeded);
-  Serial.println(stepperPitchOffset/maximalTimeNeeded);
-  Serial.println(stepperYawOffset/maximalTimeNeeded);
+  // Serial.println("Max time needed: ");
+  // Serial.println(maximalTimeNeeded);
+  // Serial.println("SPEEDS:3");
+  float leftProposedSpeed = abs(stepperLeftOffset) / maximalTimeNeeded;
+  float rightProposedSpeed = abs(stepperRightOffset) / maximalTimeNeeded;
+  float zProposedSpeed = abs(stepperZOffset) / maximalTimeNeeded;
+  float pitchProposedSpeed = abs(stepperPitchOffset) / maximalTimeNeeded;
+  float yawProposedSpeed = abs(stepperYawOffset) / maximalTimeNeeded;
 
-  // TODO implement min/max speed logic
+  // Serial.println(leftProposedSpeed);
+  // Serial.println(rightProposedSpeed);
+  // Serial.println(zProposedSpeed);
+  // Serial.println(pitchProposedSpeed);
+  // Serial.println(yawProposedSpeed);
+
+  // clamping the speeds
+  stepperLeft.setSpeed(leftProposedSpeed);
+  stepperLeft.setMaxSpeed(leftProposedSpeed);
+  stepperRight.setSpeed(rightProposedSpeed);
+  stepperRight.setMaxSpeed(rightProposedSpeed);
+  stepperZ.setSpeed(zProposedSpeed);
+  stepperZ.setMaxSpeed(zProposedSpeed);
+  pitch_speed = max(200, pitchProposedSpeed);
+  yaw_speed = max(200, yawProposedSpeed);
 }
 
 void setup() {
@@ -213,7 +225,7 @@ void setup() {
   Serial.println("Finished setup!");
 }
 
-#define GCODE_LINE_LENGTH 41
+#define GCODE_LINE_LENGTH 40
 
 File file;
 char buf[GCODE_LINE_LENGTH];  // last two lines are carriage return + newline
@@ -225,7 +237,7 @@ bool mid_job = false;
 
 bool button_pressed_temp = true;
 
-bool simulate_buffer = true;
+bool simulate_buffer = false;
 
 void updatePitchYawState() {
   pitch_pose = pitch_next;
@@ -253,6 +265,21 @@ void updateYawSteps() {
 
   if (yaw_step > 7) { yaw_step = 0; }
   if (yaw_step < 0) { yaw_step = 7; }
+}
+
+void resetMaxSpeeds() {
+  stepperLeft.setMaxSpeed(1600);
+  stepperLeft.setAcceleration(10000);
+
+  stepperRight.setMaxSpeed(1600);
+  stepperRight.setAcceleration(10000);
+
+  stepperLeft.setSpeed(1600);
+  stepperRight.setSpeed(1600);
+
+  stepperZ.setMaxSpeed(1600);
+  stepperZ.setAcceleration(10000);
+  stepperZ.setSpeed(800);
 }
 
 void loop() {
@@ -290,7 +317,7 @@ void loop() {
       display("SD inserted!", 0, true);
       display("Press button :)", 1, false);
       sd_inserted = true;
-      // add an interrupt for when the SD is removed? this can come later lol
+      // add an interrupt for when the SD is removed?
     }
   } else {  // sd is now inserted
 
@@ -305,20 +332,20 @@ void loop() {
           startSDBuffer();
         }
       }
-    } else {                  // we are mid job
-      if (reachedTarget()) {  // update next target location
-
+    } else {                    // we are mid job
+      if (reachedTarget()) {    // update next target location
         updatePitchYawState();  // only necessary for pitch and yaw :P
 
         if (simulate_buffer) {
           // READ FROM SIMULATION ---------------------
           if (currLoc < numLocs) {
-            moveCartesian(currLoc);
+            moveCartesian(locs[currLoc][0], locs[currLoc][1], locs[currLoc][2], locs[currLoc][3], locs[currLoc][4]);
             currLoc++;
           } else {
             display("JOB COMPLETED!", 0, true);
             delay(1000);
             mid_job = false;
+            resetMaxSpeeds();
 
             currLoc = 0;
           }
@@ -330,7 +357,13 @@ void loop() {
           } else {  // we are done!
             display("JOB COMPLETED!", 0, true);
             delay(1000);
+
             mid_job = false;
+            sd_inserted = false;
+            numLinesRead = 0;
+            file.close();
+
+            resetMaxSpeeds();
           }
           // READ FROM SD ---------------------
         }
@@ -464,21 +497,24 @@ void runMotors() {
   stepperRight.run();
   stepperZ.run();
 
-  timeNow = micros();
-  if (timeNow - timePrevious >= 1000) {  // attempt to step pitch (and yaw later)
+  pitch_timeNow = micros();
+  yaw_timeNow = micros();
+
+  if (pitch_speed > 0 && pitch_timeNow - pitch_timePrevious >= 1000000.0 / pitch_speed) {  // attempt to step pitch (and yaw later)
 
     if (pitch_steps_remaining > 0) {
       // Serial.println("stepping pitch");
       stepPitch();
-      timePrevious = micros();
+      pitch_timePrevious = micros();
       pitch_steps_remaining--;
       updatePitchSteps();
     }
-
+  }
+  if (yaw_speed > 0 && yaw_timeNow - yaw_timePrevious >= 1000000.0 / yaw_speed) {
     if (yaw_steps_remaining > 0) {
       // Serial.println("stepping yaw");
       stepYaw();
-      timePrevious = micros();
+      yaw_timePrevious = micros();
       yaw_steps_remaining--;
       updateYawSteps();
     }
@@ -493,15 +529,18 @@ void display(String msg, int row, bool clearScreen) {
 }
 
 void startSDBuffer() {  // reads first line
+  Serial.println("STARTING SD BUFFER-----------");
+  // file = null;
   file = SD.open("test.txt", FILE_READ);
 
+  Serial.println(file.size());
   numLines = file.size() / GCODE_LINE_LENGTH;
   Serial.print(numLines);
   Serial.println(" lines");
 
   file.read(buf, GCODE_LINE_LENGTH);
   numLinesRead = 1;
-
+  // moveCartesian(0, 0, 20, 0, 0);
   updateTargetFromSDBuffer();
 }
 
@@ -512,11 +551,36 @@ void updateSDBuffer() {
   Serial.print("read line ");
   Serial.println(numLinesRead);
   Serial.println(buf);
+
+  updateTargetFromSDBuffer();
 }
 
 // updates target location from SD buffer
 void updateTargetFromSDBuffer() {
-  // for now, just go to a random spot
+  Serial.println("UPDATING TARGET:");
+  // process buffer here
+  char temp[6];              // ok
+  memcpy(temp, &buf[4], 6);  // x
+  float x = atof(temp);
+  memcpy(temp, &buf[11], 6);
+  float y = atof(temp);
+  memcpy(temp, &buf[18], 6);
+  float z = atof(temp);
+  memcpy(temp, &buf[25], 6);
+  float pitch = atof(temp);
+  memcpy(temp, &buf[32], 6);
+  float yaw = atof(temp);
+  Serial.print(x);
+  Serial.print(" ");
+  Serial.print(y);
+  Serial.print(" ");
+  Serial.print(z);
+  Serial.print(" ");
+  Serial.print(pitch);
+  Serial.print(" ");
+  Serial.print(yaw);
+  Serial.println(" ");
+  moveCartesian(x, y, z, pitch, yaw);
 }
 
 bool reachedTarget() {
